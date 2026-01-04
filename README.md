@@ -122,16 +122,18 @@ sequenceDiagram
   participant BE as Backend (Spring Boot)
   participant DB as Baza danych
 
-  U->>FE: Wpisuje email/hasło i klika "Zaloguj"
-  FE->>BE: POST /api/auth/login {email, password}
+  U->>FE: Wpisuje email i hasło, klika Zaloguj
+  FE->>BE: POST /api/auth/login (credentials)
   BE->>DB: findByEmail(email)
   DB-->>BE: AppUser
-  BE->>BE: PasswordEncoder.matches(...)
-  BE->>BE: JwtService.createAccessToken(user)
-  BE->>BE: generate refresh token (raw) + sha256(raw)
-  BE->>DB: save RefreshToken(tokenHash, expiresAt, revoked=false)
-  BE-->>FE: 200 {accessToken} + Set-Cookie(refresh_token=...; HttpOnly)
-  FE->>FE: zapisuje accessToken w pamięci
+  BE->>BE: verify password
+  BE->>BE: create access token (JWT)
+  BE->>BE: create refresh token + hash
+  BE->>DB: save RefreshToken (hash, expiry, revoked=false)
+  BE-->>FE: 200 OK (access token)
+  Note over FE,BE: refresh_token ustawiony jako HttpOnly cookie (Set-Cookie)
+  FE->>FE: zapis access token w pamięci
+
 ```
 
 ### 4.2 Chroniony request (happy path)
