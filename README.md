@@ -189,12 +189,14 @@ sequenceDiagram
   participant BE as Backend (Spring Boot)
   participant DB as Baza danych
 
-  FE->>BE: POST /api/auth/logout (cookie refresh_token)
-  BE->>BE: sha256(refresh_token)
-  BE->>DB: mark RefreshToken revoked=true (lub delete)
+  FE->>BE: POST /api/auth/logout
+  Note over FE,BE: request zawiera refresh_token cookie (wysyłane automatycznie)
+  BE->>BE: hash refresh token
+  BE->>DB: revoke refresh token (or delete)
   DB-->>BE: OK
-  BE-->>FE: 204/200 + Set-Cookie(refresh_token=; Max-Age=0)
-  FE->>FE: czyści accessToken z pamięci
+  BE-->>FE: 204 No Content (logout success)
+  Note over FE,BE: backend czyści refresh cookie (Set-Cookie expires)
+  FE->>FE: czyści access token w pamięci
 ```
 
 ---
