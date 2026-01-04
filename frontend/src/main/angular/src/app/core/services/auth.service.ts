@@ -1,6 +1,6 @@
 import {Injectable} from '@angular/core';
 import {HttpClient} from '@angular/common/http';
-import {BehaviorSubject, Observable, of, tap} from 'rxjs';
+import {BehaviorSubject, finalize, Observable, of, shareReplay, tap} from 'rxjs';
 import {AuthApplicationService, AuthResponse, LoginRequest} from '../backend';
 import {catchError, mapTo} from 'rxjs/operators';
 
@@ -10,6 +10,7 @@ export class AuthService {
 
   private accessToken$ = new BehaviorSubject<string | undefined | null>(null);
   private refreshing = false;
+  private refreshInFlight$?: Observable<AuthResponse>;
 
   constructor(private http: HttpClient, private authApi: AuthApplicationService) {
   }
@@ -24,7 +25,7 @@ export class AuthService {
   }
 
   silentRefresh(): Observable<boolean> {
-    return this.refresh().pipe(
+    return this.refreshOnce().pipe(
       mapTo(true),
       catchError(() => of(false)) // brak cookie / 401 / 403 -> traktuj jako "niezalogowany"
     );
@@ -43,6 +44,22 @@ export class AuthService {
     return this.authApi.refresh().pipe(
       tap(r => this.accessToken$.next(r.accessToken))
     );
+  }
+
+  /**
+   * Single-flight refresh: wiele 401 naraz -> 1 refresh request, reszta podpina się pod wynik.
+   */
+  refreshOnce(): Observable<AuthResponse> {
+    if (!this.refreshInFlight$) {
+      this.refreshInFlight$ = this.authApi.refresh().pipe(
+        tap(r => this.accessToken$.next(r.accessToken)),
+        finalize(() => {
+          this.refreshInFlight$ = undefined;
+        }),
+        shareReplay({bufferSize: 1, refCount: false})
+      );
+    }
+    return this.refreshInFlight$;
   }
 
   logout(): Observable<void> {

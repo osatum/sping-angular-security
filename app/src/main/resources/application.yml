@@ -2,6 +2,10 @@ server:
   port: 8080
 
 spring:
+  profiles:
+    # w dev możesz odpalić: SPRING_PROFILES_ACTIVE=dev
+    # w prod: SPRING_PROFILES_ACTIVE=prod
+    active: dev
   datasource:
     url: jdbc:h2:mem:jmlwmb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false
     driverClassName: org.h2.Driver
@@ -31,8 +35,14 @@ app:
   cors:
     allowed-origins: "http://localhost:4200"
   security:
+    cookie:
+      # prod: true (cookie tylko po HTTPS)
+      secure: ${APP_COOKIE_SECURE:false}
+      # jeśli frontend/backend na różnych originach w prod, rozważ: None (wtedy secure musi być true)
+      same-site: ${APP_COOKIE_SAMESITE:Lax}
     jwt:
       issuer: "spring-angular-security"
       access-ttl-minutes: 10
       refresh-ttl-days: 14
-      secret: "CHANGE_ME_TO_A_LONG_RANDOM_SECRET_32CHARS_MIN"
+      secret: K9vA1c7RZPqE9W4dYxF8sL2nM6H0JQeB
+      # secret: ${APP_JWT_SECRET:}

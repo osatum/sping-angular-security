@@ -1,10 +1,12 @@
 package com.osatum.poc.sprang.web.error;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 
+@Slf4j
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
@@ -13,7 +15,8 @@ public class ApiExceptionHandler {
     public ProblemDetail unauthorized(IllegalArgumentException ex) {
         var pd = ProblemDetail.forStatus(HttpStatus.UNAUTHORIZED);
         pd.setTitle("Unauthorized");
-        pd.setDetail(ex.getMessage());
+        pd.setDetail("Unauthorized");
+        log.debug("401: {}", ex.getMessage());
         return pd;
     }
 

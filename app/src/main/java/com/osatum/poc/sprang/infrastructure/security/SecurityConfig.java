@@ -1,10 +1,14 @@
 package com.osatum.poc.sprang.infrastructure.security;
 
 import com.osatum.poc.sprang.domain.user.UserRepository;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
@@ -19,10 +23,12 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import java.io.IOException;
 import java.util.Arrays;
 
 @Configuration
 @RequiredArgsConstructor
+@Slf4j
 public class SecurityConfig {
 
     private final JwtService jwtService;
@@ -33,25 +39,37 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
+    @Value("${spring.h2.console.enabled:false}")
+    private boolean h2ConsoleEnabled;
+
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http) {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(reg -> reg
-                        .requestMatchers(
-                                "/api/auth/**",
-                                "/h2-console/**",
-                                "/v3/api-docs/**",
-                                "/swagger-ui.html",
-                                "/swagger-ui/**"
-                        )
-                        .permitAll()
+                .authorizeHttpRequests(reg -> {
+                    reg.requestMatchers(
+                                    "/api/auth/**",
+                                    "/v3/api-docs/**",
+                                    "/swagger-ui.html",
+                                    "/swagger-ui/**"
+                            )
+                            .permitAll();
 
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .anyRequest().authenticated()
-                )
+                    if (h2ConsoleEnabled) {
+                        reg.requestMatchers("/h2-console/**").permitAll();
+                    }
+
+                    reg.requestMatchers("/api/admin/**").hasRole("ADMIN");
+                    reg.anyRequest().authenticated();
+                })
+                .headers(headers -> {
+                    // H2-console działa w iframe; włącz tylko gdy console jest włączone (dev)
+                    if (h2ConsoleEnabled) {
+                        headers.frameOptions(frame -> frame.disable());
+                    }
+                })
                 .addFilterBefore(jwtFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -61,7 +79,8 @@ public class SecurityConfig {
     OncePerRequestFilter jwtFilter() {
         return new OncePerRequestFilter() {
             @Override
-            protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) {
+            protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+                    throws ServletException, IOException {
                 try {
                     String auth = request.getHeader(HttpHeaders.AUTHORIZATION);
                     if (auth != null && auth.startsWith("Bearer ")) {
@@ -86,12 +105,11 @@ public class SecurityConfig {
                         }
                     }
                     chain.doFilter(request, response);
-                } catch (Exception e) {
-                    try {
-                        chain.doFilter(request, response);
-                    } catch (Exception ignored) {
-                    }
+                } catch (JwtException | IllegalArgumentException e) {
+                    // Token zły / wygasły / niezgodny z issuerem -> traktuj jak niezalogowany.
+                    log.debug("JWT rejected: {}", e.getMessage());
                 }
+                chain.doFilter(request, response);
             }
         };
     }

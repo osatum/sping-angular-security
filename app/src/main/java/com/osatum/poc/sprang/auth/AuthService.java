@@ -6,7 +6,6 @@ import com.osatum.poc.sprang.domain.auth.RefreshToken;
 import com.osatum.poc.sprang.domain.auth.RefreshTokenRepository;
 import com.osatum.poc.sprang.domain.user.UserRepository;
 import com.osatum.poc.sprang.infrastructure.security.JwtService;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,7 +13,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -34,6 +32,12 @@ public class AuthService {
 
     @Value("${app.security.jwt.refresh-ttl-days}")
     private long refreshTtlDays;
+
+    @Value("${app.security.cookie.secure:false}")
+    private boolean refreshCookieSecure;
+
+    @Value("${app.security.cookie.same-site:Lax}")
+    private String refreshCookieSameSite;
 
     public AuthResponse login(LoginRequest req, HttpServletResponse res) {
         var user = userRepository.findByEmail(req.email())
@@ -100,22 +104,25 @@ public class AuthService {
 
         ResponseCookie cookie = ResponseCookie.from("refresh_token", raw)
                 .httpOnly(true)
-                .secure(false)      // HTTP dev
-                .sameSite("Lax")    // ważne: działa w first-party
+                .secure(refreshCookieSecure)
+                .sameSite(refreshCookieSameSite)
                 .path("/api/auth")
-                .maxAge(60L * 60 * 24 * 14)
+                .maxAge(refreshTtlDays * 24L * 60L * 60L)
                 .build();
 
         res.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
     private void clearRefreshCookie(HttpServletResponse res) {
-        Cookie cookie = new Cookie("refresh_token", "");
-        cookie.setHttpOnly(true);
-        cookie.setSecure(false);
-        cookie.setPath("/api/auth");
-        cookie.setMaxAge(0);
-        res.addCookie(cookie);
+        // spójnie z issueRefreshCookie (path/samesite/secure)
+        ResponseCookie cookie = ResponseCookie.from("refresh_token", "")
+                .httpOnly(true)
+                .secure(refreshCookieSecure)
+                .sameSite(refreshCookieSameSite)
+                .path("/api/auth")
+                .maxAge(0)
+                .build();
+        res.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
     private static String sha256Base64(String raw) {
