@@ -1,0 +1,11 @@
+<p>login works!</p>
+
+<h2>Login</h2>
+
+<form [formGroup]="form" (ngSubmit)="submit()">
+  <input placeholder="email" formControlName="email" />
+  <input placeholder="password" type="password" formControlName="password" />
+  <button [disabled]="form.invalid || loading">Zaloguj</button>
+</form>
+
+<p *ngIf="error" style="color:red">{{ error }}</p>
