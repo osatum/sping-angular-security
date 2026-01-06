@@ -15,6 +15,126 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <frontend.target.folder>src/main/angular/src/app</frontend.target.folder>
+        <tomcat.http.port>8080</tomcat.http.port>
+        <maven-assembly-plugin.version>3.7.1</maven-assembly-plugin.version>
     </properties>
+
+    <profiles>
+        <profile>
+            <id>angular</id>
+            <build>
+                <plugins>
+                    <!-- Delete code from frontend folder -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-clean-plugin</artifactId>
+                        <version>2.5</version>
+                        <executions>
+                            <execution>
+                                <id>auto-clean</id>
+                                <phase>compile</phase>
+                                <goals>
+                                    <goal>clean</goal>
+                                </goals>
+                                <configuration>
+                                    <filesets>
+                                        <fileset>
+                                            <directory>${frontend.target.folder}/core/backend</directory>
+                                            <followSymlinks>false</followSymlinks>
+                                        </fileset>
+                                    </filesets>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <!-- Generate code -->
+                    <plugin>
+                        <groupId>org.openapitools</groupId>
+                        <artifactId>openapi-generator-maven-plugin</artifactId>
+                        <version>7.12.0</version>
+
+                        <executions>
+                            <execution>
+                                <id>angular-client-code-generation</id>
+                                <phase>compile</phase>
+                                <goals>
+                                    <goal>generate</goal>
+                                </goals>
+
+                                <configuration>
+                                    <inputSpec>http://localhost:${tomcat.http.port}/v3/api-docs</inputSpec>
+                                    <generatorName>typescript-angular</generatorName>
+                                    <additionalProperties>
+                                        path=http://localhost:8080,
+                                        enumPropertyNaming=original,
+                                        modelFolder=models,
+                                        useJsonMime=true,
+                                        withInterfaces=true,
+                                        useJsonMime=true
+                                    </additionalProperties>
+
+                                    <output>${project.build.directory}/generated-sources/angular/core/backend</output>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <plugin>
+                        <groupId>com.google.code.maven-replacer-plugin</groupId>
+                        <artifactId>replacer</artifactId>
+                        <version>1.5.3</version>
+                        <executions>
+                            <execution>
+                                <phase>compile</phase>
+                                <goals>
+                                    <goal>replace</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+
+                        <configuration>
+                            <file>${project.build.directory}/generated-sources/angular/core/backend/api.base.service.ts</file>
+                            <outputFile>${project.build.directory}/generated-sources/angular/core/backend/api.base.service.ts</outputFile>
+
+                            <regex>true</regex>
+                            <replacements>
+                                <replacement>
+                                    <token>protected basePath = '';</token>
+                                    <value>protected basePath = 'http://localhost:8080';</value>
+                                </replacement>
+                            </replacements>
+                        </configuration>
+                    </plugin>
+
+                    <!-- Copy generated client code to frontend folder -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-resources-plugin</artifactId>
+                        <version>3.2.0</version>
+                        <executions>
+                            <execution>
+                                <phase>compile</phase>
+                                <goals>
+                                    <goal>copy-resources</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${basedir}/${frontend.target.folder}</outputDirectory>
+                                    <resources>
+                                        <resource>
+                                            <directory>${project.build.directory}/generated-sources/angular</directory>
+                                        </resource>
+                                    </resources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                </plugins>
+            </build>
+        </profile>
+
+    </profiles>
 
 </project>
