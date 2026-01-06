@@ -108,8 +108,9 @@ public class SecurityConfig {
                 } catch (JwtException | IllegalArgumentException e) {
                     // Token zły / wygasły / niezgodny z issuerem -> traktuj jak niezalogowany.
                     log.debug("JWT rejected: {}", e.getMessage());
+                    chain.doFilter(request, response);
                 }
-                chain.doFilter(request, response);
+
             }
         };
     }
